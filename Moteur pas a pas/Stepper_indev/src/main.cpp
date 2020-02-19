@@ -25,6 +25,8 @@ Course maximum : 190 mm = 19 tours = 19*200 = 3800stp
 #define MS3 6
 #define SWB 9
 #define SWH 8
+#define EN 12
+
 
 
 
@@ -33,13 +35,14 @@ AccelStepper moteur(AccelStepper::DRIVER,3,2); //pin stp = 3, pin dir = 2
 //long posi = 1000; // environ 50 mm
 char string[50]; // Chaine reçue 0
 long val;
-long posi;
+long posi = -200;
 
 void initPosition()
 {
   while (digitalRead(SWB) && (digitalRead(SWH)))
   {
     moteur.moveTo(200);
+    moteur.setSpeed(500);
     moteur.runSpeed();
     //Serial.println(moteur.currentPosition());
   }
@@ -47,19 +50,43 @@ void initPosition()
   {
     Serial.println("On a atteint la bonne position");
     moteur.setCurrentPosition(0);
-    /*moteur.moveTo(-2600);
+    moteur.moveTo(-200);
     while(moteur.distanceToGo()!=0 && digitalRead(SWH))
     {
-      moteur.runSpeed();
+
+      moteur.run();
       Serial.println(moteur.currentPosition());
     }
-    */
+
   }
   else
   {
     Serial.println("On est pas du bon côté");
   }
+
 }
+
+void reset()
+{
+  if(!digitalRead(SWB))
+  {
+    Serial.println("Switch Bas atteint. Reset de la position");
+    initPosition();
+  }
+  else if(!digitalRead(SWH))
+  {
+    Serial.println("Switch Haut Atteint. Reset de la position");
+    moteur.move(200);
+    while(moteur.distanceToGo()!=0)
+    {
+      moteur.runSpeed();
+    }
+    initPosition();
+
+  }
+}
+
+
 
 long Posytostp(long posy)
 {
@@ -74,14 +101,16 @@ void setup()
   pinMode(MS3, OUTPUT);
   pinMode(SWB, INPUT);
   pinMode(SWH, INPUT);
-  moteur.setMaxSpeed(1000000.0);
-  moteur.setAcceleration(150000.0);
+  pinMode(EN, OUTPUT);
+  moteur.setMaxSpeed(2000.0);
+  moteur.setAcceleration(600.0);
   //Serial.println("On essaie de faire tourner le bousin");
-  moteur.setSpeed(300000.0);
+  //moteur.setSpeed(300000.0);
   //moteur.setCurrentPosition(0);
   digitalWrite(MS1,LOW); // Passage en pas complet
   digitalWrite(MS2,LOW);
   digitalWrite(MS3,LOW);
+  digitalWrite(EN, LOW);
   initPosition();
 
   Serial.println("Entrez la position verticale à atteindre en mm svp : ");
@@ -101,27 +130,51 @@ void loop()
       string[i]=Serial.read();
     }
     val=atol(string);
-    Serial.println("Position a atteindre :");
+     // Serial.println("Position a atteindre :");
     Serial.println(val);
-    posi = Posytostp(val);
-    }
-    else
+    if(val<10 || val>130)
     {
-      Serial.println("Pas de Donnée recue");
+      Serial.println("Sortie de la course possible. Veuillez choisir une valeur comprise entre 10 et 130");
+      val = 10;
     }
+    posi = Posytostp(val);
+    /*if(posi==0)
+    {
+      posi =-200;
+    }
+    */
+  }
+  else
+  {
+    Serial.println("Pas de Donnée recue");
+  }
 
 
   moteur.moveTo(posi); // sélectionne la position à atteindre
-  while(moteur.distanceToGo()!=0 && digitalRead(SWH))
+  moteur.setAcceleration(1000);
+  while(moteur.distanceToGo()!=0 && digitalRead(SWH) && digitalRead(SWB))
   {
-    moteur.runSpeed();
+    moteur.run();
     Serial.println(moteur.currentPosition());
   }
 
 
- Serial.print("Position du moteur : ");
+
+  if(!digitalRead(SWB) || !digitalRead(SWH))
+  {
+    Serial.println("Un Switch a été activé. On stop tout !");
+    digitalWrite(EN, HIGH);
+
+  }
+  Serial.println("Posisiton attendue de l'ascenceur (mm):");
+  Serial.println(val);
+  Serial.println("Position attendue de l'ascenceur (en step)");
+  Serial.println(Posytostp(val));
+
+ Serial.print("Position atteinte du moteur : ");
  Serial.println(moteur.currentPosition());
  delay(1000);
+
   /* test rotation du moteur
   moteur.runSpeed();
   Serial.print("Position actuelle : ");
